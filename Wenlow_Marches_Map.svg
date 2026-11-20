@@ -4,14 +4,17 @@
   <title>The Wenlow Marches: campaign map</title>
   <style>
     @import url("https://fonts.googleapis.com/css2?family=IM+Fell+English:ital@0;1&amp;display=swap");
-    /* Animation is off unless the root svg element has class "animate".
-       Load the file as Wenlow_Marches_Map.svg#animate to switch it on;
+    /* Enhancements (SVG filters and animation) are off unless the root svg element has class "enhance".
+       Load the file as Wenlow_Marches_Map.svg#enhance to switch them on;
        opened any other way the map is the original static image. */
+    :root:not(.enhance) [filter] { filter: none; }
+    /* Elements that only exist to carry a filter (paper noise, worn edge) would draw as plain boxes, so hide them */
+    :root:not(.enhance) #paper-texture rect[filter] { display: none; }
     .crest-line { fill: #ffffff; fill-opacity: .9; mask: url(#crest-taper); }
     .crest-tail { fill: url(#crest-tail-fill); mask: url(#crest-taper); }
-    .animate #wave-crests { opacity: 1; }
+    .enhance #wave-crests { opacity: 1; }
     /* The whole crest travels to the shore and fades in/out */
-    .animate .crest {
+    .enhance .crest {
       opacity: 0;
       animation: crest-in var(--dur) cubic-bezier(.25,.35,.55,1) var(--delay) infinite;
     }
@@ -23,7 +26,7 @@
     }
     /* The tail is long out at sea and shortens towards the shore.
        Same timing as crest-in so the two stay in step. */
-    .animate .crest-tail {
+    .enhance .crest-tail {
       transform-box: fill-box; transform-origin: 0 50%;
       animation: tail-shrink var(--dur) cubic-bezier(.25,.35,.55,1) var(--delay) infinite;
     }
@@ -33,16 +36,16 @@
     }
     /* Rivers: faint stacked dashes travel along each river */
     .flow { stroke-opacity: .1; stroke-dashoffset: var(--o0); }
-    .animate #river-flow { opacity: 1; }
-    .animate .flow { animation: flow var(--dur) linear infinite; }
+    .enhance #river-flow { opacity: 1; }
+    .enhance .flow { animation: flow var(--dur) linear infinite; }
     @keyframes flow {
       from { stroke-dashoffset: var(--o0); }
       to   { stroke-dashoffset: var(--o1); }
     }
-    /* Weather: drifting clouds and their shadows (off unless "animate", like the sea).
+    /* Weather: drifting clouds and their shadows (off unless "enhance", like the sea).
        They travel along the same rotated axis as the wave crests, west and slightly south. */
-    .animate #weather { display: inline; }
-    .animate .cloud, .animate .cloud-shadow {
+    .enhance #weather { display: inline; }
+    .enhance .cloud, .enhance .cloud-shadow {
       animation: cloud-drift var(--dur) linear var(--delay) infinite;
     }
     @keyframes cloud-drift {
@@ -50,7 +53,7 @@
       to   { transform: translateX(var(--dx)); }
     }
     @media (prefers-reduced-motion: reduce) {
-      .animate #wave-crests, .animate #river-flow, .animate #weather { display: none; }
+      .enhance #wave-crests, .enhance #river-flow, .enhance #weather { display: none; }
     }
     .village-label, .site-label, .landmark-label {
       text-anchor: middle;
@@ -65,15 +68,104 @@
     .badge-num      { font-size: 10px; font-weight: 700; text-anchor: middle; fill: #3b2a1a; }
   </style>
   <defs>
-	<g id="triangle-tree">
-		<path d="M0 0l6 12h-12z" fill="#7d9a5a" stroke="#3b2a1a" stroke-width="1" />
-		<path d="M-1 5l6 12h-12z" fill="#7d9a5a" stroke="#3b2a1a" stroke-width="1" />
-	</g>
-	<g id="round-tree">
-		<circle cx="0" cy="0" r="5.5" fill="#9ab56c" stroke="#3b2a1a" stroke-width="1" />
-		<circle cx="5" cy="5" r="5.5" fill="#9ab56c" stroke="#3b2a1a" stroke-width="1" />
-		<circle cx="-3" cy="3" r="5.5" fill="#9ab56c" stroke="#3b2a1a" stroke-width="1" />
-	</g>
+	<filter id="field-grain" x="-15%" y="-15%" width="130%" height="130%">
+	  <!-- slightly ragged edge and wobbly furrows -->
+	  <feTurbulence type="fractalNoise" baseFrequency="0.2" numOctaves="2" seed="5" result="wob" />
+	  <feDisplacementMap in="SourceGraphic" in2="wob" scale="1.5" xChannelSelector="R" yChannelSelector="G" result="rough" />
+	  <!-- fine grain, stretched along the furrow direction (x) -->
+	  <feTurbulence type="fractalNoise" baseFrequency="0.25 0.9" numOctaves="2" seed="12" result="grain" />
+	  <feDiffuseLighting in="grain" surfaceScale="1.2" lighting-color="#fff" result="lit">
+		<feDistantLight azimuth="225" elevation="60" />
+	  </feDiffuseLighting>
+	  <feComposite in="rough" in2="lit" operator="arithmetic" k1="1.15" k2="0" k3="0" k4="0" />
+	</filter>
+	<filter id="tree-leafy" x="-40%" y="-40%" width="180%" height="180%">
+		<!-- big lumpy edge, then fine leafy fuzz -->
+		<feTurbulence type="fractalNoise" baseFrequency="0.15" numOctaves="2" seed="4" result="lump" />
+		<feDisplacementMap in="SourceGraphic" in2="lump" scale="4" xChannelSelector="R" yChannelSelector="G" result="d1" />
+		<feTurbulence type="fractalNoise" baseFrequency="0.7" numOctaves="1" seed="11" result="fine" />
+		<feDisplacementMap in="d1" in2="fine" scale="1.6" xChannelSelector="R" yChannelSelector="G" result="rough" />
+		<feGaussianBlur in="rough" stdDeviation="0.3" result="soft" />
+		<!-- leaf-clump shading, light from top-left -->
+		<feTurbulence type="fractalNoise" baseFrequency="0.45" numOctaves="2" seed="7" result="bump" />
+		<feDiffuseLighting in="bump" surfaceScale="2" lighting-color="#fff" result="lit">
+		  <feDistantLight azimuth="225" elevation="55" />
+		</feDiffuseLighting>
+		<feComposite in="soft" in2="lit" operator="arithmetic" k1="1.3" k2="0" k3="0" k4="0" />
+	  </filter>
+
+	  <filter id="default-shadow" x="-50%" y="-50%" width="200%" height="200%">
+		<feGaussianBlur stdDeviation="1.5" />
+	  </filter>
+
+	  	<g id="triangle-tree">
+		  <!-- trunk, drawn first so the lower tier overlaps it -->
+		  <rect x="-2.2" y="16" width="2.4" height="4" fill="#5a3d22" stroke="#3b2a1a" stroke-width="0.8" />
+
+		  <!-- side-view shadow: flat ellipse at the foot, pushed away from the light -->
+		  <ellipse cx="1.5" cy="20" rx="7" ry="2" fill="#1f2410" opacity="0.3" filter="url(#default-shadow)" />
+
+		  <g filter="url(#tree-leafy)">
+			<!-- your original two triangles, now the dark base with outline -->
+			<g fill="#5d7d3a" stroke="#3b2a1a" stroke-width="0.8">
+			  <path d="M0 0l6 12h-12z" />
+			  <path d="M-1 5l6 12h-12z" />
+			</g>
+			<!-- mid tone: smaller copies of each tier -->
+			<g fill="#7d9c4c">
+			  <path d="M0 1.5l4.5 9h-9z" />
+			  <path d="M-1 6.5l4.5 9h-9z" />
+			</g>
+			<!-- highlights on the lit (left) side -->
+			<g fill="#a3bf6b">
+			  <path d="M0 2.5l-3.2 6.5h2.2z" />
+			  <path d="M-1 7.5l-3.2 6.5h2.2z" />
+			</g>
+			<!-- shade on the right side -->
+			<g fill="#46602a" opacity="0.7">
+			  <path d="M1 4l3.8 7.5h-3z" />
+			  <path d="M0 9l3.8 7h-3z" />
+			</g>
+	    </g>
+	  </g>
+	  <g id="round-tree">
+		<!-- ground shadow, offset away from the light -->
+		<g fill="#1f2410" opacity="0.3" transform="translate(3,4)" filter="url(#default-shadow)">
+		  <circle cx="0" cy="0" r="6" />
+		  <circle cx="5" cy="5" r="6" />
+		  <circle cx="-3" cy="3" r="6" />
+		</g>
+
+		<!-- canopy: dark base with outline, mid tone, highlights, shaded lobes -->
+		<g filter="url(#tree-leafy)">
+		  <g fill="#5d7d3a" stroke="#3b2a1a" stroke-width="0.8">
+			<circle cx="0" cy="0" r="6.2" />
+			<circle cx="5" cy="5" r="6.2" />
+			<circle cx="-3" cy="3" r="6.2" />
+			<circle cx="-1" cy="-3" r="4.5" />
+			<circle cx="7" cy="1" r="4" />
+		  </g>
+		  <g fill="#7d9c4c">
+			<circle cx="-1" cy="-1.5" r="4.6" />
+			<circle cx="4" cy="3.5" r="4.6" />
+			<circle cx="-4" cy="1.5" r="4.4" />
+		  </g>
+		  <g fill="#a3bf6b">
+			<circle cx="-2" cy="-2.5" r="2.4" />
+			<circle cx="3" cy="1.5" r="2.2" />
+			<circle cx="-5" cy="0.5" r="2" />
+			<circle cx="1" cy="4.5" r="2" />
+		  </g>
+		  <g fill="#46602a" opacity="0.7">
+			<circle cx="6.5" cy="7" r="2.4" />
+			<circle cx="0" cy="6.5" r="2.2" />
+		  </g>
+		</g>
+	  </g>
+	<g id="field" filter="url(#field-grain)">
+      <rect x="-14" y="-9" width="28" height="18" stroke="#a58f58" stroke-width=".8" />
+      <path d="M-14-3H14M-14 3H14" fill="none" stroke="#a58f58" stroke-width=".7" />
+    </g>
 	<g id="village">
 		<rect x="-6" y="-3" width="12" height="8" fill="#f6ecd2" stroke="#3b2a1a" />
 		<path d="M-8-3L0-10L8-3Z" fill="#8a4b2a" stroke="#3b2a1a" />
@@ -650,226 +742,61 @@
     <ellipse cx="890" cy="560" rx="10" ry="6" fill="#e8d7a9" stroke="#3b2a1a" stroke-width="1.5" />
 
     <ellipse cx="720" cy="285" rx="26" ry="14" fill="#a9c4c6" stroke="#3b2a1a" stroke-width="1.5" />
-    <g transform="translate(505 355) rotate(43)">
-      <rect x="-14" y="-9" width="28" height="18" fill="#e3d49c" stroke="#a58f58" stroke-width=".8" />
-      <path d="M-14-3H14M-14 3H14" stroke="#a58f58" stroke-width=".7" />
-    </g>
-    <g transform="translate(736 375) rotate(128)">
-      <rect x="-14" y="-9" width="28" height="18" fill="#e3d49c" stroke="#a58f58" stroke-width=".8" />
-      <path d="M-14-3H14M-14 3H14" stroke="#a58f58" stroke-width=".7" />
-    </g>
-    <g transform="translate(61 297) rotate(69)">
-      <rect x="-14" y="-9" width="28" height="18" fill="#e3d49c" stroke="#a58f58" stroke-width=".8" />
-      <path d="M-14-3H14M-14 3H14" stroke="#a58f58" stroke-width=".7" />
-    </g>
-    <g transform="translate(153 348) rotate(74)">
-      <rect x="-14" y="-9" width="28" height="18" fill="#e3d49c" stroke="#a58f58" stroke-width=".8" />
-      <path d="M-14-3H14M-14 3H14" stroke="#a58f58" stroke-width=".7" />
-    </g>
-    <g transform="translate(159 279) rotate(148)">
-      <rect x="-14" y="-9" width="28" height="18" fill="#e3d49c" stroke="#a58f58" stroke-width=".8" />
-      <path d="M-14-3H14M-14 3H14" stroke="#a58f58" stroke-width=".7" />
-    </g>
-    <g transform="translate(79 429) rotate(71)">
-      <rect x="-14" y="-9" width="28" height="18" fill="#c8cf93" stroke="#a58f58" stroke-width=".8" />
-      <path d="M-14-3H14M-14 3H14" stroke="#a58f58" stroke-width=".7" />
-    </g>
-    <g transform="translate(60 485) rotate(160)">
-      <rect x="-14" y="-9" width="28" height="18" fill="#e3d49c" stroke="#a58f58" stroke-width=".8" />
-      <path d="M-14-3H14M-14 3H14" stroke="#a58f58" stroke-width=".7" />
-    </g>
-    <g transform="translate(159 481) rotate(9)">
-      <rect x="-14" y="-9" width="28" height="18" fill="#c8cf93" stroke="#a58f58" stroke-width=".8" />
-      <path d="M-14-3H14M-14 3H14" stroke="#a58f58" stroke-width=".7" />
-    </g>
-    <g transform="translate(130 509) rotate(21)">
-      <rect x="-14" y="-9" width="28" height="18" fill="#c8cf93" stroke="#a58f58" stroke-width=".8" />
-      <path d="M-14-3H14M-14 3H14" stroke="#a58f58" stroke-width=".7" />
-    </g>
-    <g transform="translate(686 212) rotate(153)">
-      <rect x="-14" y="-9" width="28" height="18" fill="#e3d49c" stroke="#a58f58" stroke-width=".8" />
-      <path d="M-14-3H14M-14 3H14" stroke="#a58f58" stroke-width=".7" />
-    </g>
-    <g transform="translate(672 287) rotate(50)">
-      <rect x="-14" y="-9" width="28" height="18" fill="#d9c58a" stroke="#a58f58" stroke-width=".8" />
-      <path d="M-14-3H14M-14 3H14" stroke="#a58f58" stroke-width=".7" />
-    </g>
-    <g transform="translate(754 160) rotate(47)">
-      <rect x="-14" y="-9" width="28" height="18" fill="#d9c58a" stroke="#a58f58" stroke-width=".8" />
-      <path d="M-14-3H14M-14 3H14" stroke="#a58f58" stroke-width=".7" />
-    </g>
-    <g transform="translate(739 76) rotate(159)">
-      <rect x="-14" y="-9" width="28" height="18" fill="#d9c58a" stroke="#a58f58" stroke-width=".8" />
-      <path d="M-14-3H14M-14 3H14" stroke="#a58f58" stroke-width=".7" />
-    </g>
-    <g transform="translate(777 115) rotate(128)">
-      <rect x="-14" y="-9" width="28" height="18" fill="#cdbb80" stroke="#a58f58" stroke-width=".8" />
-      <path d="M-14-3H14M-14 3H14" stroke="#a58f58" stroke-width=".7" />
-    </g>
-    <g transform="translate(710 157) rotate(150)">
-      <rect x="-14" y="-9" width="28" height="18" fill="#e3d49c" stroke="#a58f58" stroke-width=".8" />
-      <path d="M-14-3H14M-14 3H14" stroke="#a58f58" stroke-width=".7" />
-    </g>
-    <g transform="translate(431 237) rotate(15)">
-      <rect x="-14" y="-9" width="28" height="18" fill="#cdbb80" stroke="#a58f58" stroke-width=".8" />
-      <path d="M-14-3H14M-14 3H14" stroke="#a58f58" stroke-width=".7" />
-    </g>
-    <g transform="translate(457 155) rotate(58)">
-      <rect x="-14" y="-9" width="28" height="18" fill="#d9c58a" stroke="#a58f58" stroke-width=".8" />
-      <path d="M-14-3H14M-14 3H14" stroke="#a58f58" stroke-width=".7" />
-    </g>
-    <g transform="translate(482 220) rotate(65)">
-      <rect x="-14" y="-9" width="28" height="18" fill="#e3d49c" stroke="#a58f58" stroke-width=".8" />
-      <path d="M-14-3H14M-14 3H14" stroke="#a58f58" stroke-width=".7" />
-    </g>
-    <g transform="translate(619 387) rotate(98)">
-      <rect x="-14" y="-9" width="28" height="18" fill="#cdbb80" stroke="#a58f58" stroke-width=".8" />
-      <path d="M-14-3H14M-14 3H14" stroke="#a58f58" stroke-width=".7" />
-    </g>
-    <g transform="translate(515 589) rotate(82)">
-      <rect x="-14" y="-9" width="28" height="18" fill="#c8cf93" stroke="#a58f58" stroke-width=".8" />
-      <path d="M-14-3H14M-14 3H14" stroke="#a58f58" stroke-width=".7" />
-    </g>
-    <g transform="translate(454 575) rotate(141)">
-      <rect x="-14" y="-9" width="28" height="18" fill="#cdbb80" stroke="#a58f58" stroke-width=".8" />
-      <path d="M-14-3H14M-14 3H14" stroke="#a58f58" stroke-width=".7" />
-    </g>
-    <g transform="translate(718 637) rotate(131)">
-      <rect x="-14" y="-9" width="28" height="18" fill="#e3d49c" stroke="#a58f58" stroke-width=".8" />
-      <path d="M-14-3H14M-14 3H14" stroke="#a58f58" stroke-width=".7" />
-    </g>
-    <g transform="translate(749 606) rotate(43)">
-      <rect x="-14" y="-9" width="28" height="18" fill="#e3d49c" stroke="#a58f58" stroke-width=".8" />
-      <path d="M-14-3H14M-14 3H14" stroke="#a58f58" stroke-width=".7" />
-    </g>
-    <g transform="translate(726 203) rotate(47)">
-      <rect x="-14" y="-9" width="28" height="18" fill="#e3d49c" stroke="#a58f58" stroke-width=".8" />
-      <path d="M-14-3H14M-14 3H14" stroke="#a58f58" stroke-width=".7" />
-    </g>
-    <g transform="translate(766 203) rotate(54)">
-      <rect x="-14" y="-9" width="28" height="18" fill="#d9c58a" stroke="#a58f58" stroke-width=".8" />
-      <path d="M-14-3H14M-14 3H14" stroke="#a58f58" stroke-width=".7" />
-    </g>
-    <g transform="translate(42 183) rotate(19)">
-      <rect x="-14" y="-9" width="28" height="18" fill="#c8cf93" stroke="#a58f58" stroke-width=".8" />
-      <path d="M-14-3H14M-14 3H14" stroke="#a58f58" stroke-width=".7" />
-    </g>
-    <g transform="translate(54 146) rotate(94)">
-      <rect x="-14" y="-9" width="28" height="18" fill="#cdbb80" stroke="#a58f58" stroke-width=".8" />
-      <path d="M-14-3H14M-14 3H14" stroke="#a58f58" stroke-width=".7" />
-    </g>
-    <g transform="translate(343 217) rotate(72)">
-      <rect x="-14" y="-9" width="28" height="18" fill="#d9c58a" stroke="#a58f58" stroke-width=".8" />
-      <path d="M-14-3H14M-14 3H14" stroke="#a58f58" stroke-width=".7" />
-    </g>
-    <g transform="translate(301 238) rotate(65)">
-      <rect x="-14" y="-9" width="28" height="18" fill="#cdbb80" stroke="#a58f58" stroke-width=".8" />
-      <path d="M-14-3H14M-14 3H14" stroke="#a58f58" stroke-width=".7" />
-    </g>
-    <g transform="translate(380 256) rotate(80)">
-      <rect x="-14" y="-9" width="28" height="18" fill="#c8cf93" stroke="#a58f58" stroke-width=".8" />
-      <path d="M-14-3H14M-14 3H14" stroke="#a58f58" stroke-width=".7" />
-    </g>
-    <g transform="translate(257 492) rotate(69)">
-      <rect x="-14" y="-9" width="28" height="18" fill="#e3d49c" stroke="#a58f58" stroke-width=".8" />
-      <path d="M-14-3H14M-14 3H14" stroke="#a58f58" stroke-width=".7" />
-    </g>
-    <g transform="translate(250 455) rotate(81)">
-      <rect x="-14" y="-9" width="28" height="18" fill="#cdbb80" stroke="#a58f58" stroke-width=".8" />
-      <path d="M-14-3H14M-14 3H14" stroke="#a58f58" stroke-width=".7" />
-    </g>
-    <g transform="translate(215 468) rotate(33)">
-      <rect x="-14" y="-9" width="28" height="18" fill="#d9c58a" stroke="#a58f58" stroke-width=".8" />
-      <path d="M-14-3H14M-14 3H14" stroke="#a58f58" stroke-width=".7" />
-    </g>
-    <g transform="translate(174 537) rotate(28)">
-      <rect x="-14" y="-9" width="28" height="18" fill="#e3d49c" stroke="#a58f58" stroke-width=".8" />
-      <path d="M-14-3H14M-14 3H14" stroke="#a58f58" stroke-width=".7" />
-    </g>
-    <g transform="translate(408 428) rotate(175)">
-      <rect x="-14" y="-9" width="28" height="18" fill="#cdbb80" stroke="#a58f58" stroke-width=".8" />
-      <path d="M-14-3H14M-14 3H14" stroke="#a58f58" stroke-width=".7" />
-    </g>
-    <g transform="translate(405 388) rotate(66)">
-      <rect x="-14" y="-9" width="28" height="18" fill="#c8cf93" stroke="#a58f58" stroke-width=".8" />
-      <path d="M-14-3H14M-14 3H14" stroke="#a58f58" stroke-width=".7" />
-    </g>
-    <g transform="translate(384 455) rotate(140)">
-      <rect x="-14" y="-9" width="28" height="18" fill="#e3d49c" stroke="#a58f58" stroke-width=".8" />
-      <path d="M-14-3H14M-14 3H14" stroke="#a58f58" stroke-width=".7" />
-    </g>
-    <g transform="translate(470 428) rotate(121)">
-      <rect x="-14" y="-9" width="28" height="18" fill="#d9c58a" stroke="#a58f58" stroke-width=".8" />
-      <path d="M-14-3H14M-14 3H14" stroke="#a58f58" stroke-width=".7" />
-    </g>
-    <g transform="translate(253 97) rotate(137)">
-      <rect x="-14" y="-9" width="28" height="18" fill="#d9c58a" stroke="#a58f58" stroke-width=".8" />
-      <path d="M-14-3H14M-14 3H14" stroke="#a58f58" stroke-width=".7" />
-    </g>
-    <g transform="translate(314 59) rotate(101)">
-      <rect x="-14" y="-9" width="28" height="18" fill="#cdbb80" stroke="#a58f58" stroke-width=".8" />
-      <path d="M-14-3H14M-14 3H14" stroke="#a58f58" stroke-width=".7" />
-    </g>
-    <g transform="translate(280 40) rotate(136)">
-      <rect x="-14" y="-9" width="28" height="18" fill="#d9c58a" stroke="#a58f58" stroke-width=".8" />
-      <path d="M-14-3H14M-14 3H14" stroke="#a58f58" stroke-width=".7" />
-    </g>
-    <g transform="translate(122 130) rotate(159)">
-      <rect x="-14" y="-9" width="28" height="18" fill="#e3d49c" stroke="#a58f58" stroke-width=".8" />
-      <path d="M-14-3H14M-14 3H14" stroke="#a58f58" stroke-width=".7" />
-    </g>
-    <g transform="translate(213 52) rotate(32)">
-      <rect x="-14" y="-9" width="28" height="18" fill="#d9c58a" stroke="#a58f58" stroke-width=".8" />
-      <path d="M-14-3H14M-14 3H14" stroke="#a58f58" stroke-width=".7" />
-    </g>
-    <g transform="translate(132 32) rotate(105)">
-      <rect x="-14" y="-9" width="28" height="18" fill="#c8cf93" stroke="#a58f58" stroke-width=".8" />
-      <path d="M-14-3H14M-14 3H14" stroke="#a58f58" stroke-width=".7" />
-    </g>
-    <g transform="translate(216 90) rotate(129)">
-      <rect x="-14" y="-9" width="28" height="18" fill="#cdbb80" stroke="#a58f58" stroke-width=".8" />
-      <path d="M-14-3H14M-14 3H14" stroke="#a58f58" stroke-width=".7" />
-    </g>
-    <g transform="translate(481 504) rotate(51)">
-      <rect x="-14" y="-9" width="28" height="18" fill="#d9c58a" stroke="#a58f58" stroke-width=".8" />
-      <path d="M-14-3H14M-14 3H14" stroke="#a58f58" stroke-width=".7" />
-    </g>
-    <g transform="translate(537 542) rotate(18)">
-      <rect x="-14" y="-9" width="28" height="18" fill="#cdbb80" stroke="#a58f58" stroke-width=".8" />
-      <path d="M-14-3H14M-14 3H14" stroke="#a58f58" stroke-width=".7" />
-    </g>
-    <g transform="translate(651 562) rotate(89)">
-      <rect x="-14" y="-9" width="28" height="18" fill="#c8cf93" stroke="#a58f58" stroke-width=".8" />
-      <path d="M-14-3H14M-14 3H14" stroke="#a58f58" stroke-width=".7" />
-    </g>
-    <g transform="translate(615 543) rotate(134)">
-      <rect x="-14" y="-9" width="28" height="18" fill="#e3d49c" stroke="#a58f58" stroke-width=".8" />
-      <path d="M-14-3H14M-14 3H14" stroke="#a58f58" stroke-width=".7" />
-    </g>
-    <g transform="translate(607 652) rotate(57)">
-      <rect x="-14" y="-9" width="28" height="18" fill="#c8cf93" stroke="#a58f58" stroke-width=".8" />
-      <path d="M-14-3H14M-14 3H14" stroke="#a58f58" stroke-width=".7" />
-    </g>
-    <g transform="translate(581 571) rotate(171)">
-      <rect x="-14" y="-9" width="28" height="18" fill="#d9c58a" stroke="#a58f58" stroke-width=".8" />
-      <path d="M-14-3H14M-14 3H14" stroke="#a58f58" stroke-width=".7" />
-    </g>
-    <g transform="translate(284 293) rotate(157)">
-      <rect x="-14" y="-9" width="28" height="18" fill="#e3d49c" stroke="#a58f58" stroke-width=".8" />
-      <path d="M-14-3H14M-14 3H14" stroke="#a58f58" stroke-width=".7" />
-    </g>
-    <g transform="translate(205 340) rotate(118)">
-      <rect x="-14" y="-9" width="28" height="18" fill="#d9c58a" stroke="#a58f58" stroke-width=".8" />
-      <path d="M-14-3H14M-14 3H14" stroke="#a58f58" stroke-width=".7" />
-    </g>
-    <g transform="translate(286 365) rotate(91)">
-      <rect x="-14" y="-9" width="28" height="18" fill="#cdbb80" stroke="#a58f58" stroke-width=".8" />
-      <path d="M-14-3H14M-14 3H14" stroke="#a58f58" stroke-width=".7" />
-    </g>
-    <g transform="translate(205 287) rotate(69)">
-      <rect x="-14" y="-9" width="28" height="18" fill="#e3d49c" stroke="#a58f58" stroke-width=".8" />
-      <path d="M-14-3H14M-14 3H14" stroke="#a58f58" stroke-width=".7" />
-    </g>
+    <use href="#field" transform="translate(505 355) rotate(43)" fill="#e3d49c" />
+    <use href="#field" transform="translate(736 375) rotate(128)" fill="#e3d49c" />
+    <use href="#field" transform="translate(61 297) rotate(69)" fill="#e3d49c" />
+    <use href="#field" transform="translate(153 348) rotate(74)" fill="#e3d49c" />
+    <use href="#field" transform="translate(159 279) rotate(148)" fill="#e3d49c" />
+    <use href="#field" transform="translate(79 429) rotate(71)" fill="#c8cf93" />
+    <use href="#field" transform="translate(60 485) rotate(160)" fill="#e3d49c" />
+    <use href="#field" transform="translate(159 481) rotate(9)" fill="#c8cf93" />
+    <use href="#field" transform="translate(130 509) rotate(21)" fill="#c8cf93" />
+    <use href="#field" transform="translate(686 212) rotate(153)" fill="#e3d49c" />
+    <use href="#field" transform="translate(672 287) rotate(50)" fill="#d9c58a" />
+    <use href="#field" transform="translate(754 160) rotate(47)" fill="#d9c58a" />
+    <use href="#field" transform="translate(739 76) rotate(159)" fill="#d9c58a" />
+    <use href="#field" transform="translate(777 115) rotate(128)" fill="#cdbb80" />
+    <use href="#field" transform="translate(710 157) rotate(150)" fill="#e3d49c" />
+    <use href="#field" transform="translate(431 237) rotate(15)" fill="#cdbb80" />
+    <use href="#field" transform="translate(457 155) rotate(58)" fill="#d9c58a" />
+    <use href="#field" transform="translate(482 220) rotate(65)" fill="#e3d49c" />
+    <use href="#field" transform="translate(619 387) rotate(98)" fill="#cdbb80" />
+    <use href="#field" transform="translate(515 589) rotate(82)" fill="#c8cf93" />
+    <use href="#field" transform="translate(454 575) rotate(141)" fill="#cdbb80" />
+    <use href="#field" transform="translate(718 637) rotate(131)" fill="#e3d49c" />
+    <use href="#field" transform="translate(749 606) rotate(43)" fill="#e3d49c" />
+    <use href="#field" transform="translate(726 203) rotate(47)" fill="#e3d49c" />
+    <use href="#field" transform="translate(766 203) rotate(54)" fill="#d9c58a" />
+    <use href="#field" transform="translate(42 183) rotate(19)" fill="#c8cf93" />
+    <use href="#field" transform="translate(54 146) rotate(94)" fill="#cdbb80" />
+    <use href="#field" transform="translate(343 217) rotate(72)" fill="#d9c58a" />
+    <use href="#field" transform="translate(301 238) rotate(65)" fill="#cdbb80" />
+    <use href="#field" transform="translate(380 256) rotate(80)" fill="#c8cf93" />
+    <use href="#field" transform="translate(257 492) rotate(69)" fill="#e3d49c" />
+    <use href="#field" transform="translate(250 455) rotate(81)" fill="#cdbb80" />
+    <use href="#field" transform="translate(215 468) rotate(33)" fill="#d9c58a" />
+    <use href="#field" transform="translate(174 537) rotate(28)" fill="#e3d49c" />
+    <use href="#field" transform="translate(408 428) rotate(175)" fill="#cdbb80" />
+    <use href="#field" transform="translate(405 388) rotate(66)" fill="#c8cf93" />
+    <use href="#field" transform="translate(384 455) rotate(140)" fill="#e3d49c" />
+    <use href="#field" transform="translate(470 428) rotate(121)" fill="#d9c58a" />
+    <use href="#field" transform="translate(253 97) rotate(137)" fill="#d9c58a" />
+    <use href="#field" transform="translate(314 59) rotate(101)" fill="#cdbb80" />
+    <use href="#field" transform="translate(280 40) rotate(136)" fill="#d9c58a" />
+    <use href="#field" transform="translate(122 130) rotate(159)" fill="#e3d49c" />
+    <use href="#field" transform="translate(213 52) rotate(32)" fill="#d9c58a" />
+    <use href="#field" transform="translate(132 32) rotate(105)" fill="#c8cf93" />
+    <use href="#field" transform="translate(216 90) rotate(129)" fill="#cdbb80" />
+    <use href="#field" transform="translate(481 504) rotate(51)" fill="#d9c58a" />
+    <use href="#field" transform="translate(537 542) rotate(18)" fill="#cdbb80" />
+    <use href="#field" transform="translate(651 562) rotate(89)" fill="#c8cf93" />
+    <use href="#field" transform="translate(615 543) rotate(134)" fill="#e3d49c" />
+    <use href="#field" transform="translate(607 652) rotate(57)" fill="#c8cf93" />
+    <use href="#field" transform="translate(581 571) rotate(171)" fill="#d9c58a" />
+    <use href="#field" transform="translate(284 293) rotate(157)" fill="#e3d49c" />
+    <use href="#field" transform="translate(205 340) rotate(118)" fill="#d9c58a" />
+    <use href="#field" transform="translate(286 365) rotate(91)" fill="#cdbb80" />
+    <use href="#field" transform="translate(205 287) rotate(69)" fill="#e3d49c" />
     <use href="#domed-hill" x="219" y="203" />
     <use href="#domed-hill" x="70" y="175" />
     <use href="#domed-hill" x="77" y="120" />
@@ -1204,7 +1131,7 @@
     <path d="M660 452 C674 452 722 451 745 452 C768 453 791 457 800 458 " fill="none" stroke="#6f9fb0" stroke-width="12" stroke-linecap="round" />
     <!-- River flow: each crest is 6 faint dashed copies of the river, stacked into a
          soft-fronted crest with a fading tail. data-dir="1" flows along the drawn
-         path, data-dir="-1" against it. Hidden unless the map is animated. -->
+         path, data-dir="-1" against it. Hidden unless the map is enhanced. -->
     <g id="river-flow" opacity="0" fill="none" stroke="#ffffff">
       <g class="river" data-dir="1">
         <path class="flow" d="M60 120 C75 132 120 171 150 190 C180 209 210 218 240 235 C270 252 303 274 330 290 C357 306 378 316 400 330 C422 344 440 361 460 375 C480 389 498 404 520 415 C542 426 567 434 590 440 C613 446 634 450 660 452 C686 454 722 451 745 452 C768 453 791 457 800 458" stroke-width="6.0" stroke-dasharray="59.8 55.1" style="--o0:168.1;--o1:53.2;--dur:6.12s" />
@@ -1558,7 +1485,7 @@
       <text y="-48" text-anchor="middle" font-size="14" font-weight="700" fill="#3b2a1a">N</text>
     </g>
   </g>
-  <!-- Weather: clouds and their shadows. Hidden unless animated (#animate), clipped to the map.
+  <!-- Weather: clouds and their shadows. Hidden unless enhanced (#enhance), clipped to the map.
        SHADOW STRENGTH: change opacity on #cloud-shadows.  CLOUD STRENGTH: change opacity on #clouds.
        (0 = off, 1 = full strength). Fill colours are set on the same groups. -->
   <g id="weather" display="none" clip-path="url(#m)" pointer-events="none">
@@ -1763,8 +1690,8 @@
   </g>
   <script><![CDATA[
     (function () {
-      if (!/(^|[#&])animate\b/.test(location.hash)) return;
-      document.documentElement.classList.add('animate');
+      if (!/(^|[#&])enhance\b/.test(location.hash)) return;
+      document.documentElement.classList.add('enhance');
 
       // The crests live in a group rotated by -ANG degrees about (CX, CY),
       // so they travel along that group's x axis: west and slightly south.
@@ -1822,10 +1749,10 @@
     })();
   ]]></script>
   <script><![CDATA[
-    // Clouds: same switch as the sea (#animate). Each cloud shape (#cloud-N in <defs>) is shown twice,
+    // Clouds: same switch as the sea (#enhance). Each cloud shape (#cloud-N in <defs>) is shown twice,
     // once in #clouds and once, offset, in #cloud-shadows, so a shadow always matches its cloud.
     (function () {
-      if (!/(^|[#&])animate\b/.test(location.hash)) return;
+      if (!/(^|[#&])enhance\b/.test(location.hash)) return;
       var NS = 'http://www.w3.org/2000/svg';
       // Same rotated frame as the wave crests: drift is along local -x (west and slightly south).
       var ANG = 12, CX = 900, CY = 380;
