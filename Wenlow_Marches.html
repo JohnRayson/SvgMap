@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>The Wenlow Marches</title>
+<style>
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; background: #2b2118; overflow: hidden; }
+
+  /* The viewport owns all pointer input; the SVG objects just sit inside it. */
+  #viewport {
+    position: fixed; inset: 0;
+    overflow: hidden;
+    touch-action: none;
+    cursor: grab;
+    user-select: none;
+    -webkit-user-select: none;
+  }
+  #viewport.dragging { cursor: grabbing; }
+
+  /* Natural pixel size is set in JS; position/scale is applied as one transform each. */
+  #viewport object {
+    position: absolute; left: 0; top: 0;
+    transform-origin: 0 0;
+    pointer-events: none;
+    border: 0;
+    box-shadow: 0 2px 12px rgba(0,0,0,.55);
+  }
+
+  #controls {
+    position: fixed;
+    right: max(12px, env(safe-area-inset-right));
+    bottom: max(12px, env(safe-area-inset-bottom));
+    display: flex; gap: 6px;
+    z-index: 2;
+  }
+  #controls button {
+    min-width: 40px; height: 40px; padding: 0 12px;
+    font: 600 18px/1 Georgia, serif;
+    color: #3b2a1a; background: #d9c692;
+    border: 2px solid #3b2a1a; border-radius: 6px;
+    cursor: pointer;
+  }
+  #controls button:hover { background: #e6d6a4; }
+  #controls button:focus-visible { outline: 3px solid #fff; outline-offset: 2px; }
+  #controls button.fit { font-size: 14px; }
+</style>
+</head>
+<body>
+
+<div id="viewport">
+  <object id="map" type="image/svg+xml" data="Wenlow_Marches_Map.svg#animate" aria-label="Map of the Wenlow Marches"></object>
+  <object id="key" type="image/svg+xml" data="Wenlow_Marches_Key.svg" aria-label="Key to the Wenlow Marches map"></object>
+</div>
+
+<div id="controls" role="group" aria-label="Zoom controls">
+  <button type="button" id="zoomOut" aria-label="Zoom out">&minus;</button>
+  <button type="button" id="zoomIn" aria-label="Zoom in">+</button>
+  <button type="button" id="zoomFit" class="fit" aria-label="Fit to screen">Fit</button>
+</div>
+
+<script>
+(() => {
+  // ---- Settings -----------------------------------------------------------
+  // Natural size (px) each SVG renders at when loaded on its own.
+  // Map: its viewBox is -34 -34 1068 828 (the file fills its viewport).
+  // Key: width/height attributes are 440 x 708.
+  const NAT = { map: { w: 1068, h: 828 }, key: { w: 440, h: 708 } };
+  const GAP = 1;                 // space between the two images (stage units)
+  const TWO_COL_MIN_WIDTH = 800;  // px: at or above this, show two columns
+  const PAD = 16;                 // breathing room when fitting to screen
+
+  // ---- Elements -----------------------------------------------------------
+  const vp = document.getElementById('viewport');
+  const els = { map: document.getElementById('map'), key: document.getElementById('key') };
+  for (const k of ['map', 'key']) {
+    els[k].style.width = NAT[k].w + 'px';
+    els[k].style.height = NAT[k].h + 'px';
+  }
+
+  // ---- Layout in "stage" coordinates --------------------------------------
+  // Two columns: same height. Stacked: same width.
+  let items, total, twoCol;
+
+  function layout() {
+    twoCol = window.innerWidth >= TWO_COL_MIN_WIDTH;
+    if (twoCol) {
+      const H = NAT.map.h;
+      const keyW = NAT.key.w * H / NAT.key.h;
+      items = {
+        map: { x: 0, y: 0, w: NAT.map.w, h: H },
+        key: { x: NAT.map.w + GAP, y: 0, w: keyW, h: H }
+      };
+      total = { w: NAT.map.w + GAP + keyW, h: H };
+    } else {
+      const W = NAT.map.w;
+      const keyH = NAT.key.h * W / NAT.key.w;
+      items = {
+        map: { x: 0, y: 0, w: W, h: NAT.map.h },
+        key: { x: 0, y: NAT.map.h + GAP, w: W, h: keyH }
+      };
+      total = { w: W, h: NAT.map.h + GAP + keyH };
+    }
+    for (const k of ['map', 'key']) items[k].k = items[k].w / NAT[k].w;
+  }
+
+  // ---- View state: one scale + offset for the whole composite -------------
+  let s = 1, tx = 0, ty = 0, fitScale = 1, touched = false;
+
+  function render() {
+    for (const k of ['map', 'key']) {
+      const it = items[k];
+      els[k].style.transform =
+        `translate(${tx + s * it.x}px, ${ty + s * it.y}px) scale(${s * it.k})`;
+    }
+  }
+
+  function fit() {
+    const vw = window.innerWidth, vh = window.innerHeight;
+    if (twoCol) {
+      // Whole composite on screen, centred.
+      s = Math.min((vw - 2 * PAD) / total.w, (vh - 2 * PAD) / total.h);
+      tx = (vw - total.w * s) / 2;
+      ty = (vh - total.h * s) / 2;
+    } else {
+      // Narrow: fit the width, start at the top, scroll/pan down to the key.
+      s = (vw - 2 * PAD) / total.w;
+      tx = PAD;
+      ty = PAD;
+    }
+    fitScale = s;
+    touched = false;
+    render();
+  }
+
+  const MIN_FACTOR = 0.25, MAX_FACTOR = 24;
+  function zoomAt(px, py, factor) {
+    const ns = Math.min(Math.max(s * factor, fitScale * MIN_FACTOR), fitScale * MAX_FACTOR);
+    const f = ns / s;
+    tx = px - (px - tx) * f;
+    ty = py - (py - ty) * f;
+    s = ns;
+    touched = true;
+    render();
+  }
+
+  // ---- Input: wheel, drag, pinch, keys, buttons ---------------------------
+  vp.addEventListener('wheel', e => {
+    e.preventDefault();
+    const unit = e.deltaMode === 1 ? 16 : e.deltaMode === 2 ? 400 : 1;
+    const rate = e.ctrlKey ? 0.01 : 0.0015;   // ctrlKey = trackpad pinch
+    zoomAt(e.clientX, e.clientY, Math.exp(-e.deltaY * unit * rate));
+  }, { passive: false });
+
+  const pointers = new Map();
+  let last = null; // previous pinch state
+
+  function pinchState() {
+    const [a, b] = [...pointers.values()];
+    return { d: Math.hypot(a.x - b.x, a.y - b.y) || 1, mx: (a.x + b.x) / 2, my: (a.y + b.y) / 2 };
+  }
+
+  vp.addEventListener('pointerdown', e => {
+    vp.setPointerCapture(e.pointerId);
+    pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    vp.classList.add('dragging');
+    if (pointers.size === 2) last = pinchState();
+  });
+
+  vp.addEventListener('pointermove', e => {
+    const p = pointers.get(e.pointerId);
+    if (!p) return;
+    if (pointers.size === 1) {
+      tx += e.clientX - p.x;
+      ty += e.clientY - p.y;
+      p.x = e.clientX; p.y = e.clientY;
+      touched = true;
+      render();
+    } else if (pointers.size === 2) {
+      p.x = e.clientX; p.y = e.clientY;
+      const cur = pinchState();
+      tx += cur.mx - last.mx;
+      ty += cur.my - last.my;
+      zoomAt(cur.mx, cur.my, cur.d / last.d);
+      last = cur;
+    }
+  });
+
+  function endPointer(e) {
+    pointers.delete(e.pointerId);
+    if (pointers.size < 2) last = null;
+    if (pointers.size === 0) vp.classList.remove('dragging');
+  }
+  vp.addEventListener('pointerup', endPointer);
+  vp.addEventListener('pointercancel', endPointer);
+
+  vp.addEventListener('dblclick', e => zoomAt(e.clientX, e.clientY, 2));
+
+  const cx = () => window.innerWidth / 2, cy = () => window.innerHeight / 2;
+  document.getElementById('zoomIn').addEventListener('click', () => zoomAt(cx(), cy(), 1.5));
+  document.getElementById('zoomOut').addEventListener('click', () => zoomAt(cx(), cy(), 1 / 1.5));
+  document.getElementById('zoomFit').addEventListener('click', fit);
+
+  window.addEventListener('keydown', e => {
+    if (e.ctrlKey || e.metaKey || e.altKey) return;
+    if (e.key === '+' || e.key === '=') zoomAt(cx(), cy(), 1.25);
+    else if (e.key === '-' || e.key === '_') zoomAt(cx(), cy(), 1 / 1.25);
+    else if (e.key === '0') fit();
+  });
+
+  // ---- Resize: relayout; refit unless the user has zoomed/panned ----------
+  let wasTwoCol;
+  window.addEventListener('resize', () => {
+    layout();
+    if (!touched || twoCol !== wasTwoCol) fit(); else render();
+    wasTwoCol = twoCol;
+  });
+
+  layout();
+  wasTwoCol = twoCol;
+  fit();
+})();
+</script>
+</body>
+</html>
